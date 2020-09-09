@@ -63,23 +63,20 @@ class DatabaseBuilderWriter extends Writer {
         ..name = 'callback'
         ..type = refer('Callback'))));
 
-    final versionParameter = Parameter((builder) => builder
-      ..name = 'version'
-      ..toThis = refer('int'));
     final pswParameter = Parameter((builder) => builder
       ..name = 'psw'
-      ..toThis = refer('String'));
+      ..type = refer('String'));
 
     final createTableStatements =
-    _generateCreateTableSqlStatements(database.entities)
+    _generateCreateTableSqlStatements(_database.entities)
         .map((statement) => "await database.execute('$statement');")
         .join('\n');
-    final createIndexStatements = database.entities
+    final createIndexStatements = _database.entities
         .map((entity) => entity.indices.map((index) => index.createQuery()))
         .expand((statements) => statements)
         .map((statement) => "await database.execute('$statement');")
         .join('\n');
-    final createViewStatements = database.views
+    final createViewStatements = _database.views
         .map((view) => view.getCreateViewStatement())
         .map((statement) => "await database.execute('''$statement''');")
         .join('\n');
@@ -96,7 +93,7 @@ class DatabaseBuilderWriter extends Writer {
         final database = _\$$_databaseName();
         
         database.database = await sqlcipher.openDatabase(path,
-        version: version,
+        version: ${_database.version},
         onConfigure: (database) async {
           await database.execute('PRAGMA foreign_keys = ON');
         },
@@ -118,7 +115,7 @@ class DatabaseBuilderWriter extends Writer {
         password: psw);
         return database;
       ''')
-      ..requiredParameters.addAll([versionParameter,pswParameter]));
+      ..requiredParameters.add(pswParameter));
 
     return Class((builder) => builder
       ..name = databaseBuilderName
@@ -133,5 +130,10 @@ class DatabaseBuilderWriter extends Writer {
         addCallbackMethod,
         buildMethod,
       ]));
+  }
+
+  @nonNull
+  List<String> _generateCreateTableSqlStatements(final List<Entity> entities) {
+    return entities.map((entity) => entity.getCreateTableStatement()).toList();
   }
 }

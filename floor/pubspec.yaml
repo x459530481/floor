@@ -32,7 +32,7 @@ dev_dependencies:
   floor_generator:
     git:
       url: 'https://github.com/x459530481/floor_generator.git'
-      ref: e13a6dfc98576fda480f8ad66b3fad8460bd7748
+      ref: 5b8afb2b7120dd1dd1a901a9579c3ef900fed9ea
 #  floor_generator:
 #    path: ../floor_generator/
   build_runner: ^1.7.3
