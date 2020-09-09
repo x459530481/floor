@@ -32,7 +32,7 @@ class FloorGenerator extends GeneratorForAnnotation<annotations.Database> {
 
     final library = Library((builder) => builder
       ..body.add(FloorWriter(database.name).write())
-      ..body.add(DatabaseBuilderWriter(database.name).write())
+      ..body.add(DatabaseBuilderWriter(database.name,database).write())
       ..body.add(databaseClass)
       ..body.addAll(daoClasses));
 

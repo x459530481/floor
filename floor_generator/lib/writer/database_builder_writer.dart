@@ -4,9 +4,11 @@ import 'package:floor_generator/writer/writer.dart';
 
 class DatabaseBuilderWriter extends Writer {
   final String _databaseName;
+  final Database _database;
 
-  DatabaseBuilderWriter(final String databaseName)
-      : _databaseName = databaseName;
+  DatabaseBuilderWriter(final String databaseName,final Database database;)
+      : _databaseName = databaseName,
+        _database = database;
 
   @nonNull
   @override
@@ -57,6 +59,27 @@ class DatabaseBuilderWriter extends Writer {
         ..name = 'callback'
         ..type = refer('Callback'))));
 
+    final versionParameter = Parameter((builder) => builder
+      ..name = 'version'
+      ..toThis = refer('int'));
+    final pswParameter = Parameter((builder) => builder
+      ..name = 'psw'
+      ..toThis = refer('String'));
+
+    final createTableStatements =
+    _generateCreateTableSqlStatements(database.entities)
+        .map((statement) => "await database.execute('$statement');")
+        .join('\n');
+    final createIndexStatements = database.entities
+        .map((entity) => entity.indices.map((index) => index.createQuery()))
+        .expand((statements) => statements)
+        .map((statement) => "await database.execute('$statement');")
+        .join('\n');
+    final createViewStatements = database.views
+        .map((view) => view.getCreateViewStatement())
+        .map((statement) => "await database.execute('''$statement''');")
+        .join('\n');
+
     final buildMethod = Method((builder) => builder
       ..returns = refer('Future<$_databaseName>')
       ..name = 'build'
@@ -67,13 +90,31 @@ class DatabaseBuilderWriter extends Writer {
           ? await sqfliteDatabaseFactory.getDatabasePath(name)
           : ':memory:';
         final database = _\$$_databaseName();
-        database.database = await database.open(
-          path,
-          _migrations,
-          _callback,
-        );
+        
+        database.database = await sqlcipher.openDatabase(path,
+        version: version,
+        onConfigure: (database) async {
+          await database.execute('PRAGMA foreign_keys = ON');
+        },
+        onOpen: (database) async {
+          await _callback?.onOpen?.call(database);
+        },
+        onUpgrade: (database, startVersion, endVersion) async {
+          await MigrationAdapter.runMigrations(
+              database, startVersion, endVersion, _migrations);
+
+          await _callback?.onUpgrade?.call(database, startVersion, endVersion);
+        },
+        onCreate: (database, version) async {
+          $createTableStatements
+          $createIndexStatements
+          $createViewStatements
+          await _callback?.onCreate?.call(database, version);
+        },
+        password: psw);
         return database;
-      '''));
+      ''')
+      ..requiredParameters.addAll([versionParameter,pswParameter]));
 
     return Class((builder) => builder
       ..name = databaseBuilderName
